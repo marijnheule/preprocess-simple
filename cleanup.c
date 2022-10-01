@@ -3,6 +3,8 @@
 
 #define LRAT
 
+FILE* lrat = NULL;
+
 int *mask, *vIndex, *cIndex, stamp = 0, max;
 
 int isSatisfied (int *clause) {
@@ -16,34 +18,37 @@ int removeFalsified (int *clause, int index) {
   int count = 0;
   int *_clause = clause;
   int flag = 0;
-#ifdef LRAT
-  while (*clause) {
-    if (mask[-*clause] == stamp)
-      flag = 1;
-    clause++; }
-  clause = _clause;
 
-  if (flag) {
-    printf ("c %i ", ++max);
-    while (*clause) {
-      if (mask[-*clause] != stamp)
-        printf ("%i ", *clause);
-      clause++; }
-    printf ("0 %i ", cIndex[index]);
-    clause = _clause;
+  if (lrat != NULL) {
     while (*clause) {
       if (mask[-*clause] == stamp)
-        printf ("%i ", vIndex[abs(*clause)]);
+        flag = 1;
       clause++; }
-    printf ("0\n");
     clause = _clause;
 
-    cIndex[index] = max;
+    if (flag) {
+      fprintf (lrat, "%i ", ++max);
+      while (*clause) {
+        if (mask[-*clause] != stamp)
+          fprintf (lrat, "%i ", *clause);
+        clause++; }
+      fprintf (lrat, "0 %i ", cIndex[index]);
+      clause = _clause;
+      while (*clause) {
+        if (mask[-*clause] == stamp)
+          fprintf (lrat, "%i ", vIndex[abs(*clause)]);
+        clause++; }
+      fprintf (lrat, "0\n");
+      clause = _clause;
+
+      fprintf (lrat, "%i d %i 0\n", max, cIndex[index]);
+      cIndex[index] = max;
+    }
   }
-#endif
+
   while (*clause) {
     if (mask[-*clause] == stamp) {
-      printf ("c remove literal %i (%i) from clause %i\n", *clause, vIndex[abs(*clause)], index);
+//      printf ("c remove literal %i (%i) from clause %i\n", *clause, vIndex[abs(*clause)], index);
       count++;
     }
     else {
@@ -79,9 +84,15 @@ void printClause (int *clause) {
   printf("0\n"); }
 
 int main (int argc, char** argv) {
-  FILE* cnf;
+  FILE *cnf=NULL, *map=NULL;
 
   cnf = fopen (argv[1], "r");
+
+  if (argc > 2) {
+    lrat = fopen (argv[2], "w"); }
+
+  if (argc > 3) {
+    map = fopen (argv[3], "w"); }
 
   int tmp, lit, nVar, nCls;
   tmp = fscanf (cnf, " p cnf %i %i ", &nVar, &nCls);
@@ -113,6 +124,9 @@ int main (int argc, char** argv) {
   vIndex = (int*) malloc (sizeof(int) * nVar);
   cIndex = (int*) malloc (sizeof(int) * nCls);
 
+  int nSatis = 0;
+  int *satis  = (int*) malloc (sizeof(int) * nCls);
+
   for (int i = 1; i <= nVar; i++) vIndex[i] = 0;
   for (int i = 0; i <  nCls; i++) cIndex[i] = i+1;
 
@@ -121,20 +135,22 @@ int main (int argc, char** argv) {
   while (iter) {
     iter = 0, j = 0;
     for (int i = 0; i < nCls; i++) {
-      if (isSatisfied (table + cls[i])) { iter = 1; continue; }
+      if (isSatisfied (table + cls[i])) {
+        satis[nSatis++] = cIndex[i];
+        iter = 1;
+        continue; }
       if (table[cls[i] + 1] == 0) {
         if (mask[ table[cls[i]] ] != stamp) {
-          printf ("c found new unit %i\n", table[cls[i]]);
+//          printf ("c found new unit %i\n", table[cls[i]]);
           vIndex[abs(table[cls[i]])] = cIndex[i];
           iter = 1; }
         mask[ table[cls[i]] ] = stamp; }
       if (removeFalsified (table + cls[i], i)) iter = 1;
+      cIndex[j] = cIndex[i];
       cls[j++] = cls[i]; }
     nCls = j; }
 
-  int unitStamp = stamp;
-
-
+/*
   // active, length, occ, list
 
   int* active = (int*) malloc (sizeof(int) * nCls);
@@ -150,7 +166,6 @@ int main (int argc, char** argv) {
       length[i]++;
       occ[*clause++]++; }
     if (length[i] > lmax) lmax = length[i]; }
-
 
   int** list = (int**) malloc (sizeof(int*) * (nVar * 2 + 1)); list += nVar;
   for (int i = 1; i <= nVar; i++) {
@@ -188,23 +203,21 @@ int main (int argc, char** argv) {
   j = 0;
   for (int i = 0; i < nCls; i++) if (active[i]) cls[j++] = cls[i];
   nCls = j;
-
-  int units = 0;
-/*
-  for (int i = 1; i <= nVar; i++)
-    if (mask[i] == unitStamp || mask[-i] == unitStamp) units++;
 */
-  printf("p cnf %i %i\n", nVar, nCls + units);
+
+  if (lrat && nSatis) {
+    fprintf (lrat, "%i d ", ++max);
+    for (int i = 0; i < nSatis; i++)
+      fprintf (lrat, "%i ", satis[i]);
+    fprintf (lrat, "0\n");
+  }
+
+  printf("p cnf %i %i\n", nVar, nCls);
   for (int i = 0; i < nCls; i++) {
     printClause (table + cls[i]); }
-/*
-  for (int i = 1; i <= nVar; i++) {
-    if (mask[ i] == unitStamp && mask[-i] == unitStamp) printf("0\n");
-    if (mask[ i] == unitStamp)                          printf("%i 0\n",  i);
-    if (mask[-i] == unitStamp)                          printf("%i 0\n", -i); }
-*/
-  for (int i = 0; i < nCls; i++) {
-    if (cIndex[i] != i+1)
-      printf ("c %i %i\n", i+1, cIndex[i]);
-  }
+
+  if (map != NULL) {
+    for (int i = 0; i < nCls; i++)
+      if (cIndex[i] != i+1)
+        fprintf (map, "%i %i\n", i+1, cIndex[i]); }
 }
