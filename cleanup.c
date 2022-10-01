@@ -1,21 +1,51 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define PUREGATE
+#define LRAT
 
-int *mask, stamp = 0;
+int *mask, *vIndex, *cIndex, stamp = 0, max;
 
 int isSatisfied (int *clause) {
+  if (clause[1] == 0) return 0;
   while (*clause) {
     if (mask[*clause] == stamp) return 1;
     clause++; }
   return 0; }
 
-int removeFalsified (int *clause) {
+int removeFalsified (int *clause, int index) {
   int count = 0;
   int *_clause = clause;
+  int flag = 0;
+#ifdef LRAT
   while (*clause) {
-    if (mask[-*clause] == stamp) count++;
+    if (mask[-*clause] == stamp)
+      flag = 1;
+    clause++; }
+  clause = _clause;
+
+  if (flag) {
+    printf ("c %i ", ++max);
+    while (*clause) {
+      if (mask[-*clause] != stamp)
+        printf ("%i ", *clause);
+      clause++; }
+    printf ("0 %i ", cIndex[index]);
+    clause = _clause;
+    while (*clause) {
+      if (mask[-*clause] == stamp)
+        printf ("%i ", vIndex[abs(*clause)]);
+      clause++; }
+    printf ("0\n");
+    clause = _clause;
+
+    cIndex[index] = max;
+  }
+#endif
+  while (*clause) {
+    if (mask[-*clause] == stamp) {
+      printf ("c remove literal %i (%i) from clause %i\n", *clause, vIndex[abs(*clause)], index);
+      count++;
+    }
     else {
       *_clause++ = *clause; }
     clause++; }
@@ -58,6 +88,8 @@ int main (int argc, char** argv) {
   mask = (int*) malloc (sizeof (int) * (2*nVar + 1));
   mask += nVar;
 
+  max = nCls;
+
   int size = 0, *table, *cls;
   table = (int*) malloc (sizeof(int) * 100 * nCls);
   cls   = (int*) malloc (sizeof(int) * (nCls+1));
@@ -70,27 +102,38 @@ int main (int argc, char** argv) {
     table [size++] = lit;
     if (lit == 0) cls[++nCls] = size; }
 
-  int i, j = 0, k;
-  for (i = 0; i < nCls; i++) {
+  int j = 0, k;
+  for (int i = 0; i < nCls; i++) {
     if (isTautology (table + cls[i])) continue;
     removeDuplicateLiterals (table + cls[i]);
     cls[j++] = cls[i]; }
   nCls = j;
 
+
+  vIndex = (int*) malloc (sizeof(int) * nVar);
+  cIndex = (int*) malloc (sizeof(int) * nCls);
+
+  for (int i = 1; i <= nVar; i++) vIndex[i] = 0;
+  for (int i = 0; i <  nCls; i++) cIndex[i] = i+1;
+
   stamp++;
   int iter = 1;
   while (iter) {
     iter = 0, j = 0;
-    for (i = 0; i < nCls; i++) {
+    for (int i = 0; i < nCls; i++) {
       if (isSatisfied (table + cls[i])) { iter = 1; continue; }
       if (table[cls[i] + 1] == 0) {
-        if (mask[ table[cls[i]] ] != stamp) iter = 1;
+        if (mask[ table[cls[i]] ] != stamp) {
+          printf ("c found new unit %i\n", table[cls[i]]);
+          vIndex[abs(table[cls[i]])] = cIndex[i];
+          iter = 1; }
         mask[ table[cls[i]] ] = stamp; }
-      if (removeFalsified (table + cls[i])) iter = 1;
+      if (removeFalsified (table + cls[i], i)) iter = 1;
       cls[j++] = cls[i]; }
     nCls = j; }
 
   int unitStamp = stamp;
+
 
   // active, length, occ, list
 
@@ -99,8 +142,9 @@ int main (int argc, char** argv) {
   int* occ    = (int*) malloc (sizeof(int) * (nVar * 2 + 1)); occ += nVar;
 
   int l, lmax = 1;
-  for (i = 0; i < nCls; i++) {
-    active[i] = 1; length[i] = 0;
+  for (int i = 0; i < nCls; i++) {
+    active[i] = 1;
+    length[i] = 0;
     int* clause = table + cls[i];
     while (*clause) {
       length[i]++;
@@ -109,11 +153,11 @@ int main (int argc, char** argv) {
 
 
   int** list = (int**) malloc (sizeof(int*) * (nVar * 2 + 1)); list += nVar;
-  for (i = 1; i <= nVar; i++) {
+  for (int i = 1; i <= nVar; i++) {
     list[ i] = (int*) malloc (sizeof(int) * occ[ i]); occ[ i] = 0;
     list[-i] = (int*) malloc (sizeof(int) * occ[-i]); occ[-i] = 0; }
 
-  for (i = 0; i < nCls; i++) {
+  for (int i = 0; i < nCls; i++) {
     int* clause = table + cls[i];
     while (*clause) {
       int lit = *clause++;
@@ -121,7 +165,7 @@ int main (int argc, char** argv) {
 
   // find subsumed clauses and make them inactive
   for (l = 2; l <= lmax; l++)
-    for (i = 0; i < nCls; i++)
+    for (int i = 0; i < nCls; i++)
       if (length[i] == l && active[i]) {
         stamp++;
         int* clause = table + cls[i];
@@ -140,82 +184,27 @@ int main (int argc, char** argv) {
               if (mask[*super++] == stamp) matched++; }
             if (matched == l) active[s] = 0; } } }
 
-#ifdef PUREGATE
-  // printf ("c pure gate\n");
-  iter = 1;
-  while (iter) {
-    iter = 0;
-  for (i = 1; i <= nVar; i++) {
-    if ((occ[i] == 0) || (occ[-i] == 0)) continue;
-
-    int pos = 0, neg = 0;
-    for (j = 0; j < occ[i]; j++) {
-      int c = list[i][j];
-      if (active[c]) {
-        stamp++;
-        pos = 1;
-        int* clause = table + cls[c];
-        while (*clause) mask[*clause++] = stamp;
-        for (k = 0; k < occ[-i]; k++) {
-           int b = list[-i][k];
-           if (active[b]) {
-             int count = 0;
-             int* blocked = table + cls[b];
-             while (*blocked) if (mask[-(*blocked++)] >= stamp) count++;
-             if (count  < 2) goto nextVar;
-             if (count == 2) {
-               blocked = table + cls[b];
-               while (*blocked) if (mask[-(*blocked++)] == stamp) mask[-blocked[-1]] = stamp + 1; } } }
-        stamp++;
-        clause = table + cls[c];
-        while (*clause) if (mask[*clause++] != stamp) goto nextVar; } }
-
-    for (j = 0; j < occ[-i]; j++) {
-      int c = list[-i][j];
-      if (active[c]) {
-        stamp++;
-        neg = 1;
-        int* clause = table + cls[c];
-        while (*clause) mask[*clause++] = stamp;
-        for (k = 0; k < occ[i]; k++) {
-           int b = list[i][k];
-           if (active[b]) {
-             int count = 0;
-             int* blocked = table + cls[b];
-             while (*blocked) if (mask[-(*blocked++)] >= stamp) count++;
-             if (count  < 2) goto nextVar;
-             if (count == 2) {
-               blocked = table + cls[b];
-               while (*blocked) if (mask[-(*blocked++)] == stamp) mask[-blocked[-1]] = stamp + 1; } } }
-        stamp++;
-        clause = table + cls[c];
-        while (*clause) if (mask[*clause++] != stamp) goto nextVar; } }
-
-    if ((pos == 0) || (neg == 0)) goto nextVar;
-    iter = 1;
-    mask[ i] = unitStamp;
-    for (j = 0; j < occ[ i]; j++) active[list[ i][j]] = 0;
-    for (j = 0; j < occ[-i]; j++) active[list[-i][j]] = 0;
-    printf("c found pure gate: %i\n", i);
-    nextVar:;
-  } }
-#endif
-
   // remove subsumed (inactive) clauses
   j = 0;
-  for (i = 0; i < nCls; i++) if (active[i]) cls[j++] = cls[i];
+  for (int i = 0; i < nCls; i++) if (active[i]) cls[j++] = cls[i];
   nCls = j;
 
   int units = 0;
-  for (i = 1; i <= nVar; i++)
+/*
+  for (int i = 1; i <= nVar; i++)
     if (mask[i] == unitStamp || mask[-i] == unitStamp) units++;
-
+*/
   printf("p cnf %i %i\n", nVar, nCls + units);
-  for (i = 0; i < nCls; i++) {
+  for (int i = 0; i < nCls; i++) {
     printClause (table + cls[i]); }
-
-  for (i = 1; i <= nVar; i++) {
+/*
+  for (int i = 1; i <= nVar; i++) {
     if (mask[ i] == unitStamp && mask[-i] == unitStamp) printf("0\n");
     if (mask[ i] == unitStamp)                          printf("%i 0\n",  i);
     if (mask[-i] == unitStamp)                          printf("%i 0\n", -i); }
+*/
+  for (int i = 0; i < nCls; i++) {
+    if (cIndex[i] != i+1)
+      printf ("c %i %i\n", i+1, cIndex[i]);
+  }
 }
