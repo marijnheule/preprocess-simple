@@ -214,7 +214,7 @@ int main (int argc, char** argv) {
     for (int i = 0; i < nCls; i++)
       if (isTautology (table + cls[i])) {
         nTaut++;
-        fprintf (lrat, "%i ", i); }
+        fprintf (lrat, "%i ", cIndex[i]); }
     for (int i = 0; i < nSatis; i++)
       fprintf (lrat, "%i ", satis[i]);
     fprintf (lrat, "0\n");
