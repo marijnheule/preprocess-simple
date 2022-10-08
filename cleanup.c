@@ -115,7 +115,10 @@ int main (int argc, char** argv) {
 
   int j = 0, k;
   for (int i = 0; i < nCls; i++) {
-    if (isTautology (table + cls[i])) continue;
+//    if (isTautology (table + cls[i])) {
+//      printf ("c tautology %i\n", i);
+//      continue;
+//    }
     removeDuplicateLiterals (table + cls[i]);
     cls[j++] = cls[i]; }
   nCls = j;
@@ -205,19 +208,26 @@ int main (int argc, char** argv) {
   nCls = j;
 */
 
+  int nTaut = 0;
   if (lrat && nSatis) {
     fprintf (lrat, "%i d ", ++max);
+    for (int i = 0; i < nCls; i++)
+      if (isTautology (table + cls[i])) {
+        nTaut++;
+        fprintf (lrat, "%i ", i); }
     for (int i = 0; i < nSatis; i++)
       fprintf (lrat, "%i ", satis[i]);
     fprintf (lrat, "0\n");
   }
 
-  printf("p cnf %i %i\n", nVar, nCls);
+  printf("p cnf %i %i\n", nVar, nCls - nTaut);
   for (int i = 0; i < nCls; i++) {
-    printClause (table + cls[i]); }
+    if (!isTautology (table + cls[i]))
+      printClause (table + cls[i]); }
 
   if (map != NULL) {
     for (int i = 0; i < nCls; i++)
-      if (cIndex[i] != i+1)
-        fprintf (map, "%i %i\n", i+1, cIndex[i]); }
+      if (!isTautology (table + cls[i]))
+        if (cIndex[i] != i+1)
+          fprintf (map, "%i %i\n", i+1, cIndex[i]); }
 }
