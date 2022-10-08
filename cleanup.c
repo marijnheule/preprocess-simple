@@ -209,12 +209,15 @@ int main (int argc, char** argv) {
 */
 
   int nTaut = 0;
+  for (int i = 0; i < nCls; i++)
+    if (isTautology (table + cls[i]))
+      nTaut++;
+
   if (lrat && nSatis) {
     fprintf (lrat, "%i d ", ++max);
     for (int i = 0; i < nCls; i++)
-      if (isTautology (table + cls[i])) {
-        nTaut++;
-        fprintf (lrat, "%i ", cIndex[i]); }
+      if (isTautology (table + cls[i]))
+        fprintf (lrat, "%i ", cIndex[i]);
     for (int i = 0; i < nSatis; i++)
       fprintf (lrat, "%i ", satis[i]);
     fprintf (lrat, "0\n");
