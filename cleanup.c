@@ -102,7 +102,8 @@ int main (int argc, char** argv) {
   max = nCls;
 
   int size = 0, *table, *cls;
-  table = (int*) malloc (sizeof(int) * 100 * nCls);
+  int tableSize = 2*nCls;
+  table = (int*) malloc (sizeof(int) * tableSize);
   cls   = (int*) malloc (sizeof(int) * (nCls+1));
   nCls = 0;
 
@@ -110,6 +111,11 @@ int main (int argc, char** argv) {
   while (1) {
     tmp = fscanf (cnf, " %i ", &lit);
     if (tmp != 1) break;
+    if (size == tableSize) {
+//      printf ("c resize table\n");
+      tableSize *= 2;
+      table = (int*) realloc (table, sizeof(int) * tableSize);
+    }
     table [size++] = lit;
     if (lit == 0) cls[++nCls] = size; }
 
