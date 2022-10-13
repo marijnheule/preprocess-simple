@@ -130,7 +130,7 @@ int main (int argc, char** argv) {
   nCls = j;
 
 
-  vIndex = (int*) malloc (sizeof(int) * nVar);
+  vIndex = (int*) malloc (sizeof(int) * (nVar+1));
   cIndex = (int*) malloc (sizeof(int) * nCls);
 
   int nSatis = 0;
