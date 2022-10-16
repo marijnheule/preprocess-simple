@@ -58,11 +58,13 @@ int removeFalsified (int *clause, int index) {
   return count; }
 
 int isTautology (int *clause) {
+#ifndef LRAT
   stamp++;
   while (*clause) {
     if (mask[-*clause] == stamp) return 1;
     mask[*clause] = stamp;
     clause++; }
+#endif
   return 0; }
 
 int removeDuplicateLiterals (int *clause) {
