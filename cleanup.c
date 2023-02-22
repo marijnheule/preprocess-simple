@@ -231,9 +231,14 @@ int main (int argc, char** argv) {
     fprintf (lrat, "0\n");
   }
 
+  int unsat = 0;
+
   printf("p cnf %i %i\n", nVar, nCls - nTaut);
   for (int i = 0; i < nCls; i++) {
     if (!isTautology (table + cls[i]))
+      if (table[cls[i]] == 0) {
+//        printf ("c found empty clause\n");
+        unsat = 1; }
       printClause (table + cls[i]); }
 
   if (map != NULL) {
@@ -241,4 +246,7 @@ int main (int argc, char** argv) {
       if (!isTautology (table + cls[i]))
         if (cIndex[i] != i+1)
           fprintf (map, "%i %i\n", i+1, cIndex[i]); }
+
+  if (unsat) return 20;
+  return 0;
 }
