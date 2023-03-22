@@ -6,6 +6,7 @@
 FILE* lrat = NULL;
 
 int *mask, *vIndex, *cIndex, stamp = 0, max;
+int foundEmptyClause = 0;
 
 int isSatisfied (int *clause) {
   if (clause[1] == 0) return 0;
@@ -28,9 +29,11 @@ int removeFalsified (int *clause, int index) {
 
     if (flag) {
       fprintf (lrat, "%i ", ++max);
+      int empty = 1;
       while (*clause) {
-        if (mask[-*clause] != stamp)
+        if (mask[-*clause] != stamp) {
           fprintf (lrat, "%i ", *clause);
+          empty = 0; }
         clause++; }
       fprintf (lrat, "0 ");
       clause = _clause;
@@ -43,6 +46,9 @@ int removeFalsified (int *clause, int index) {
 
       fprintf (lrat, "%i d %i 0\n", max, cIndex[index]);
       cIndex[index] = max;
+      if (empty) {
+        foundEmptyClause = 1;
+        return 1; }
     }
   }
 
@@ -158,8 +164,10 @@ int main (int argc, char** argv) {
         mask[ table[cls[i]] ] = stamp; }
       if (removeFalsified (table + cls[i], i)) iter = 1;
       cIndex[j] = cIndex[i];
-      cls[j++] = cls[i]; }
-    nCls = j; }
+      cls[j++] = cls[i];
+      if (foundEmptyClause) break; }
+    nCls = j;
+    if (foundEmptyClause) break; }
 
 /*
   // active, length, occ, list
@@ -216,6 +224,11 @@ int main (int argc, char** argv) {
   nCls = j;
 */
 
+  if (foundEmptyClause) {
+    printf("p cnf 1 1\n0\n");
+    return 20;
+  }
+
   int nTaut = 0;
   for (int i = 0; i < nCls; i++)
     if (isTautology (table + cls[i]))
@@ -231,14 +244,9 @@ int main (int argc, char** argv) {
     fprintf (lrat, "0\n");
   }
 
-  int unsat = 0;
-
   printf("p cnf %i %i\n", nVar, nCls - nTaut);
   for (int i = 0; i < nCls; i++) {
     if (!isTautology (table + cls[i]))
-      if (table[cls[i]] == 0) {
-//        printf ("c found empty clause\n");
-        unsat = 1; }
       printClause (table + cls[i]); }
 
   if (map != NULL) {
@@ -247,6 +255,5 @@ int main (int argc, char** argv) {
         if (cIndex[i] != i+1)
           fprintf (map, "%i %i\n", i+1, cIndex[i]); }
 
-  if (unsat) return 20;
   return 0;
 }
